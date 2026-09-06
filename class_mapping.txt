@@ -1,0 +1,5 @@
+{
+    "circle": 1,
+    "square": 2,
+    "triangle": 3
+}
