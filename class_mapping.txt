@@ -1,6 +1,5 @@
 {
-    ".git": 1,
-    "circle": 2,
-    "square": 3,
-    "triangle": 4
+    "circle": 1,
+    "square": 2,
+    "triangle": 3
 }

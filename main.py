@@ -11,6 +11,7 @@ BLACK_THRESHOLD = 128
 OUTPUT_FILE = "image_data.csv"
 CLASS_MAPPING_FILE = "class_mapping.txt"
 IMAGE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".png", ".tif", ".tiff"}
+DATA_DIRECTORIES = ["circle", "square", "triangle"]
 
 
 def create_headers() -> list[str]:
@@ -45,11 +46,14 @@ def main() -> None:
     root_directory = Path(__file__).resolve().parent
     output_path = root_directory / OUTPUT_FILE
     mapping_path = root_directory / CLASS_MAPPING_FILE
-    class_directories = sorted(
-        directory
-        for directory in root_directory.iterdir()
-        if directory.is_dir() and not directory.name.startswith("__")
-    )
+    class_directories = [root_directory / directory_name for directory_name in DATA_DIRECTORIES]
+    missing_directories = [
+        directory for directory in class_directories if not directory.is_dir()
+    ]
+    if missing_directories:
+        missing_names = ", ".join(directory.name for directory in missing_directories)
+        raise FileNotFoundError(f"Class folder(s) not found: {missing_names}")
+
     class_mapping = {
         directory.name: class_id
         for class_id, directory in enumerate(class_directories, start=1)

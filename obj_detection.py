@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import cv2
+import joblib
 import numpy as np
 import pandas as pd
 from sklearn.metrics import mean_absolute_error
@@ -15,6 +16,8 @@ BLACK_THRESHOLD = 128
 CSV_FILE = "image_data.csv"
 CLASS_MAPPING_FILE = "class_mapping.txt"
 IMAGE_FILE = "test_image.png"
+MODEL_FILE = "object_detection_model.joblib"
+TRAIN = True
 
 
 def image_to_features(image_path: Path) -> np.ndarray:
@@ -34,6 +37,8 @@ def image_to_features(image_path: Path) -> np.ndarray:
 def load_class_mapping(mapping_path: Path) -> dict[str, int]:
 	with mapping_path.open(encoding="utf-8") as mapping_file:
 		mapping = json.load(mapping_file)
+	if isinstance(mapping, list):
+		return {name: class_id for class_id, name in enumerate(mapping, start=1)}
 	return {name: int(class_id) for name, class_id in mapping.items()}
 
 
@@ -52,11 +57,11 @@ def predict_image(
 	class_name = next(
 		name for name, value in class_mapping.items() if value == class_id
 	)
-	uncertainty = abs(predicted_id - class_id) * 100 / class_id
+	
 
 	print(f"Predicted object type value: {predicted_id:.2f}")
 	print(f"Predicted object: {class_name} (ID {class_id})")
-	print(f"Uncertainty: {uncertainty:.2f}%")
+
 
 
 def main() -> None:
@@ -73,25 +78,36 @@ def main() -> None:
 	args = parser.parse_args()
 
 	root_directory = Path(__file__).resolve().parent
-	data = pd.read_csv(root_directory / CSV_FILE)
 	class_mapping = load_class_mapping(root_directory / CLASS_MAPPING_FILE)
+	model_path = root_directory / MODEL_FILE
 
-	y = data["object_type"]
-	X = data.drop(columns=["object_type"])
+	if TRAIN:
+		data = pd.read_csv(root_directory / CSV_FILE)
+		y = data["object_type"]
+		X = data.drop(columns=["object_type"])
 
-	train_X, val_X, train_y, val_y = train_test_split(
-		X,
-		y,
-		test_size=0.25,
-		random_state=1,
-		stratify=y,
-	)
+		train_X, val_X, train_y, val_y = train_test_split(
+			X,
+			y,
+			test_size=0.25,
+			random_state=1,
+			stratify=y,
+		)
 
-	model = DecisionTreeRegressor(random_state=1)
-	model.fit(train_X, train_y)
-	val_predictions = model.predict(val_X)
-	val_mae = mean_absolute_error(val_y, val_predictions)
-	print(f"Validation MAE: {val_mae:.2f}")
+		model = DecisionTreeRegressor(random_state=1)
+		model.fit(train_X, train_y)
+		val_predictions = model.predict(val_X)
+		val_mae = mean_absolute_error(val_y, val_predictions)
+		joblib.dump(model, model_path)
+		print(f"Validation MAE: {val_mae:.2f}")
+		print(f"Saved trained model to {model_path.name}")
+	else:
+		if not model_path.is_file():
+			raise FileNotFoundError(
+				f"No saved model found at {model_path}. Set TRAIN = True first."
+			)
+		model = joblib.load(model_path)
+		print(f"Loaded saved model from {model_path.name}")
 
 	if not args.image_path.is_file():
 		raise FileNotFoundError(f"Input image does not exist: {args.image_path}")
